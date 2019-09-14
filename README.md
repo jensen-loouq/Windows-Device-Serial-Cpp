@@ -24,7 +24,7 @@ A modern C++ wrapper class for the Win32 API serial communications.
 #include <iostream>
 #include "SerialDevice.h"
 
-using namespace Windows::Devices::SerialCommunication;
+using namespace Win32::Devices;
 
 
 void HandleRxData(std::string);
