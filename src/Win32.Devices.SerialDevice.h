@@ -48,6 +48,13 @@ namespace Win32
 			Byte_Size8b = 8
 		} SerialByteSize;
 
+		typedef enum
+		{			
+			StopBits_1 = ONESTOPBIT,
+			StopBits_1_5 = ONE5STOPBITS,
+			StopBits_2 = TWOSTOPBITS
+		} SerialStopBits;
+
 		using OnRxData = CoreZero::Delegate<void(std::string)>;
 
 		struct SerialDevice	final				

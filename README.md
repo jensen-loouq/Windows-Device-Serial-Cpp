@@ -27,3 +27,9 @@ A modern C++ wrapper class for the Win32 API serial communications.
 ## License
 
 This project is licensed under the GNU GPLv3 License. See the [LICENSE](LICENSE) file for details.
+
+## ToDo Tasks
+- [ ] Read data into a stream object held by the serial device.
+- [ ] Thread protect comm handle.
+- [ ] Add Examples / Use cases.
+- [ ] Emulate stl iostream.
