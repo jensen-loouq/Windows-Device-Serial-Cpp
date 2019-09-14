@@ -1,3 +1,4 @@
+![serial logo](https://static.thenounproject.com/png/74769-200.png)
 # Windows-Desktop-Serial #
 A modern C++ wrapper class for the Win32 API serial communications.
 
