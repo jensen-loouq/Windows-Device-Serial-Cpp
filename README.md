@@ -20,6 +20,7 @@ A modern C++ wrapper class for the Win32 API serial communications.
 
 ## Examples
 
+### Basic Send (reactive - event handles receive)
 ```cpp
 #include <iostream>
 #include "SerialDevice.h"
