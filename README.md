@@ -20,6 +20,33 @@ A modern C++ wrapper class for the Win32 API serial communications.
 
 ## Examples
 
+```cpp
+#include <iostream>
+#include "SerialDevice.h"
+
+using namespace Windows::Devices::SerialCommunication;
+
+
+void HandleRxData(std::string);
+
+int main()
+{
+	SerialDevice at_port = { SerialDevice::FromPortNumber(10) };
+	at_port.UsingEvents(true);
+	at_port.ReceivedData += HandleRxData;
+	at_port.BaudRate(CBR_115200);
+
+	//	turn off echo
+	at_port.Write("ATE0\r");
+	while (true)
+		;
+}
+
+void HandleRxData(std::string in)
+{
+	std::cout << in << std::endl;
+}
+```
 
 ## Authors
 
