@@ -1,6 +1,8 @@
 ![serial logo](https://static.thenounproject.com/png/74769-200.png)
 # Windows-Desktop-Serial #
-A modern C++ wrapper class for the Win32 API serial communications.
+A modern C++ wrapper class for the Win32 API serial communications. The Win32 API for serial communication is documented around 1995, and slightly difficult to use (especially for those not familiar with C).
+This wrapper class seeks to make the consumption of the Win32 Serial API easier to use, by porting it to C++11 language standards and with the support of the STL. This wrapper class pursues a design to force
+the creation of serial devices during runtime.
 
 
 ## Getting Started
