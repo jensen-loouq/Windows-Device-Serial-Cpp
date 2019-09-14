@@ -1,3 +1,4 @@
+![alt text](https://png.pngtree.com/svg/20160519/96c0c9929c.png)
 # Windows-Desktop-Serial #
 A modern C++ wrapper class for the Win32 API serial communications.
 
