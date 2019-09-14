@@ -14,13 +14,24 @@ namespace Win32
 {
 	namespace Devices
 	{		
+		/**********************************************************************
+		 *	Constructor.
+		 *
+		 *	\param[in] A nullptr, representing the requested serial device was
+		 *		not available.
+		 */
 		SerialDevice::SerialDevice(std::nullptr_t)
 		{
 			throw std::exception("Serial Device was unavailable or not found!");
 		}
 
 
-
+		/**********************************************************************
+		 *	Construct from a provided SerialDevice that has an initialized comm
+		 *		handle.
+		 *
+		 *	\param[in] A pointer to an available serial device.
+		 */
 		SerialDevice::SerialDevice(SerialDevice* serialDevicePtr)
 			: m_pComm(serialDevicePtr->m_pComm)
 			, m_portNum(serialDevicePtr->m_portNum)
@@ -35,6 +46,9 @@ namespace Win32
 
 
 
+		/**********************************************************************
+		 *	Destruct and close the comm handle.
+		 */
 		SerialDevice::~SerialDevice()
 		{
 			Close();
@@ -42,6 +56,13 @@ namespace Win32
 
 
 
+		/**********************************************************************
+		 *	Obtain a serial device from a specified COM Port number.
+		 *		 
+		 *	\param[in] COMPortNum The number of the COM Port. i.e. "COM10"
+		 *		requires an input of 10.
+		 *	\returns A serial device with an initalized comm handle.
+		 */
 		SerialDevice* SerialDevice::FromPortNumber(uint16_t COMPortNum)
 		{
 			std::wstring port_dir = { L"\\\\.\\COM" + std::to_wstring(COMPortNum) };
@@ -69,6 +90,9 @@ namespace Win32
 
 
 
+		/**********************************************************************
+		 *	Close the serial device connection.		 		 
+		 */
 		void SerialDevice::Close()
 		{
 			if (m_pComm != nullptr)
@@ -85,7 +109,12 @@ namespace Win32
 		}
 
 
-
+		/**********************************************************************
+		 *	Tell the serial device to use a separate thread for awaiting events
+		 *		from the comm.
+		 *
+		 *	\param[in] usingCommEv Indicates whether to use serial events.
+		 */
 		void SerialDevice::UsingEvents(bool usingCommEv)
 		{
 			m_thCommEv = new std::thread(&SerialDevice::interrupt_thread, this);
@@ -94,6 +123,11 @@ namespace Win32
 
 
 
+		/**********************************************************************
+		 *	Write a stl string to the serial device.
+		 *
+		 *	\param[in] src_string The string containing source data.
+		 */
 		void SerialDevice::Write(const std::string& src_str)
 		{
 			write(src_str.c_str(), src_str.length());
@@ -101,6 +135,11 @@ namespace Win32
 
 
 
+		/**********************************************************************
+		 *	Read data from the serial device and put it into an stl string.
+		 *
+		 *	\param[out] dest_str The string designating the received data.
+		 */
 		void SerialDevice::Read(std::string& dest_str)
 		{
 			char temp[128];
@@ -108,6 +147,13 @@ namespace Win32
 			dest_str = { temp, len };
 		}
 
+
+
+		/**********************************************************************
+		 *	Indicates the data received and available in the Rx buffer.
+		 *
+		 *	\returns The number of bytes avaialbe in the Rx buffer.
+		 */
 		uint32_t SerialDevice::Available()
 		{
 			DWORD err_flags = { 0 };
@@ -119,6 +165,11 @@ namespace Win32
 
 
 
+		/**********************************************************************
+		 *	Sets the baudrate.
+		 *
+		 *	\param[in] baudrate The baud rate of the communication.
+		 */
 		void SerialDevice::BaudRate(uint32_t baudrate)
 		{
 			m_baudrate = baudrate;
@@ -127,6 +178,11 @@ namespace Win32
 
 
 
+		/**********************************************************************
+		 *	Gets the baudrate
+		 *
+		 *	\returns The current baud rate of the communication.
+		 */
 		uint32_t SerialDevice::BaudRate() const
 		{
 			return m_baudrate;
@@ -134,21 +190,38 @@ namespace Win32
 
 
 
+		/**********************************************************************
+		 *	Sets the stop bits.
+		 *
+		 *	\param[in]	stopBits The number of stop bits to use for data
+		 *		flow control.
+		 */
 		void SerialDevice::StopBits(uint8_t stopBits)
 		{
-			//m_stopBits = stopBits;
+			// \TODO: m_stopBits = stopBits;
 			config_settings();
 		}
 
 
 
+		/**********************************************************************
+		 *	Gets the number of stop bits.
+		 *
+		 *	\returns The number of stop bits currently used for flow control.
+		 */
 		uint8_t SerialDevice::StopBits() const
-		{				
+		{
+			// \TODO: return m_stopBits
 			return uint8_t();
 		}
 
 
 
+		/**********************************************************************
+		 *	Set the size of a byte.
+		 *
+		 *	\param[in] byteSize The size of bytes in the communication.
+		 */
 		void SerialDevice::ByteSize(SerialByteSize byteSize)
 		{
 			m_byteSize = byteSize;
@@ -157,6 +230,11 @@ namespace Win32
 
 
 
+		/**********************************************************************
+		 *	Gets the size of a byte.
+		 *
+		 *	\returns The current size of bytes in the communication.
+		 */
 		SerialByteSize SerialDevice::ByteSize() const
 		{
 			return m_byteSize;
@@ -164,6 +242,14 @@ namespace Win32
 
 
 
+		/**********************************************************************
+		 *	Basic write function that calls to the win32 api for serial
+		 *		writing.
+		 *
+		 *	\param[in] _src The source of the data to write to the serial
+		 *		device.
+		 *	\param[in] len The length of the source data.
+		 */
 		void SerialDevice::write(const void* _src, size_t len)
 		{
 			DWORD written;
@@ -183,6 +269,13 @@ namespace Win32
 
 
 
+		/**********************************************************************
+		 *	Basic read function that calls to the win32 api for serial reading.
+		 *
+		 *	\param[out] _dest The destination buffer for holding Rx data.
+		 *	\param[in] len The capacity of the destination buffer.
+		 *	\returns The number of bytes read into the destination buffer.
+		 */
 		size_t SerialDevice::read(void* _dest, size_t len)
 		{
 			//DWORD event_mask = { 0 };
@@ -198,6 +291,9 @@ namespace Win32
 
 
 
+		/**********************************************************************
+		 *	Configure the settings of the serial device using the win32 api.
+		 */
 		void SerialDevice::config_settings()
 		{
 			DCB data_cntrl_blk = { 0 };
@@ -272,6 +368,10 @@ namespace Win32
 
 
 
+		/**********************************************************************
+		 *	Configure the serial timeouts for read/write operations by calling
+		 *		the win32 api.
+		 */
 		void SerialDevice::config_timeouts()
 		{
 			COMMTIMEOUTS timeouts;
@@ -311,6 +411,10 @@ namespace Win32
 		}
 
 
+
+		/**********************************************************************
+		 *	Clear the comm handle via a call to the win32 api.
+		 */
 		void SerialDevice::clear_comm()
 		{
 			//	Clear the port
@@ -321,8 +425,17 @@ namespace Win32
 		}
 
 
+
+		/**********************************************************************
+		 *	The background thread that awaits events on the comm. Using the
+		 *		win32 api, this thread sets the comm mask to await any received
+		 *		character. Upon characters, the thread checks for how many,
+		 *		reads the characters into a buffer, and then calls the CoreZero
+		 *		event, thus calling a user-defined handler.
+		 */
 		void SerialDevice::interrupt_thread()
 		{
+			//	set the comm mask to await received character events
 			if (SetCommMask(m_pComm, EV_RXCHAR) == FALSE)
 			{
 				std::cerr << "Serial Error: Unable to set comm mask!" << std::endl;
@@ -332,11 +445,23 @@ namespace Win32
 				while (true)
 				{
 					DWORD event_mask = { 0 };
+
+					//	await a received character event (win32)
 					WaitCommEvent(m_pComm, &event_mask, NULL);
+
+					//	check for how many characters are available
 					size_t len = Available();
+
+					//	create a destination buffer for rx chars
 					uint8_t* buf = new uint8_t[len];
+					
+					//	read data into buffer
 					read(buf, len);
+
+					//	trigger event, passing an stl string containing data
 					ReceivedData(std::string((char*)buf, len));
+
+					// recycle the buffer
 					delete[] buf;
 				}
 			}
