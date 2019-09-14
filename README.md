@@ -49,6 +49,9 @@ void HandleRxData(std::string in)
 }
 ```
 
+Which should turn echo off on an AT device, returning 0.
+> 0
+
 ## Authors
 
 * [Jensen Miller](https://github.com/jensen-loouq) - [LooUQ Incorporated](https://github.com/LooUQ)
