@@ -17,7 +17,7 @@ A modern C++ wrapper class for the Win32 API serial communications.
 
 ## Authors
 
-* **Jensen Miller - [LooUQ Incorporated](https://github.com/LooUQ)
+* Jensen Miller - [LooUQ Incorporated](https://github.com/LooUQ)
 
 ## License
 
