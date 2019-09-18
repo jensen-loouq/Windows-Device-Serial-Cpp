@@ -36,7 +36,7 @@
 #include <array>
 #include <thread>
 
-#include "CoreZero.Event.hpp"
+#include <CoreZero.Event.hpp>
 
 namespace Win32
 {

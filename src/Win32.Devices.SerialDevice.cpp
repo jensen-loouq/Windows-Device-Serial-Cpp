@@ -1,7 +1,7 @@
 //	Copyright (c) 2019 LooUQ Incorporated.
 
 //	Licensed under the GNU GPLv3. See LICENSE file in the project root for full license information.
-#include "Win32.Devices.SerialDevice.h
+#include "Win32.Devices.SerialDevice.h"
 
 #define NO_SHARING	NULL
 #define NO_SECURITY	NULL
