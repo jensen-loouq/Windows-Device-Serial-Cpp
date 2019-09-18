@@ -16,8 +16,8 @@ the creation of serial devices during runtime.
 
 
 ### Building
-[x] [Visual Studio](https://visualstudio.microsoft.com/vs/): You can include the source files in a Win32 Console project via shared code project or directly and build using MSVC.
-[ ] [GCC](https://gcc.gnu.org/): If you have [MinGW](http://mingw.org/), you can build using g++ with the provided makefile.
+- [x] [Visual Studio](https://visualstudio.microsoft.com/vs/): You can include the source files in a Win32 Console project via shared code project or directly and build using MSVC.
+- [ ] [GCC](https://gcc.gnu.org/): If you have [MinGW](http://mingw.org/), you can build using g++ with the provided makefile.
 
 
 ## Examples
