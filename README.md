@@ -25,7 +25,7 @@ the creation of serial devices during runtime.
 ### Basic Send (reactive - event handles receive)
 ```cpp
 #include <iostream>
-#include "SerialDevice.h"
+#include <Win32.Devices.SerialDevice.h>
 
 using namespace Win32::Devices;
 
