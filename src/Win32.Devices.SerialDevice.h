@@ -35,6 +35,7 @@
 #include <string>
 #include <array>
 #include <thread>
+#include <atomic>
 
 #include <CoreZero.Event.hpp>
 
@@ -57,7 +58,7 @@ namespace Win32
 
 		using OnRxData = CoreZero::Delegate<void(std::string)>;
 
-		struct SerialDevice	final				
+		struct SerialDevice	final
 		{				
 			SerialDevice(std::nullptr_t);
 			SerialDevice(SerialDevice* serialDevicePtr);
@@ -103,7 +104,7 @@ namespace Win32
 
 		private:
 			///	Native handle for sercom.
-			HANDLE m_pComm = nullptr;
+			std::atomic<HANDLE> m_pComm = nullptr;
 
 			///	COM port number.
 			uint16_t m_portNum = (uint16_t)-1;

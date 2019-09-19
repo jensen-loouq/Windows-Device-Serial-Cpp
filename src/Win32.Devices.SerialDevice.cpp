@@ -33,10 +33,10 @@ namespace Win32
 		 *	\param[in] A pointer to an available serial device.
 		 */
 		SerialDevice::SerialDevice(SerialDevice* serialDevicePtr)
-			: m_pComm(serialDevicePtr->m_pComm)
+			: m_pComm(serialDevicePtr->m_pComm.load())
 			, m_portNum(serialDevicePtr->m_portNum)
 		{
-			serialDevicePtr->m_pComm = nullptr;
+			serialDevicePtr->m_pComm.store(nullptr);
 			delete serialDevicePtr;
 
 			config_settings();
@@ -143,6 +143,7 @@ namespace Win32
 		void SerialDevice::Read(std::string& dest_str)
 		{
 			char temp[128];
+
 			size_t len = read(temp, 128);
 			dest_str = { temp, len };
 		}
