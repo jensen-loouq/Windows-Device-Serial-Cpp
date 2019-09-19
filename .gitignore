@@ -324,3 +324,4 @@ ASALocalRun/
 .mfractor/
 /tests/x64/Debug
 /tests/Debug
+/tests/Win32/Debug

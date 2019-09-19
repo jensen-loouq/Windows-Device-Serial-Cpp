@@ -26,7 +26,7 @@ namespace tests
 
 			serial_device.BaudRate(TestBuadRate);
 			serial_device.Write("ATE0\r");
-			
+			std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 			std::string response;
 			serial_device.Read(response);
 			Assert::IsTrue(response.compare("0") == 0);	// compare returns 0 on true
@@ -52,6 +52,7 @@ namespace tests
 			);
 
 			serial_device.Write("ATE0\r");
+			serial_device.Write("ATV0\r");
 			while (!signal)
 				;
 			Assert::IsTrue(signal);
