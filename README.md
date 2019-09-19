@@ -51,8 +51,8 @@ void HandleRxData(std::string in)
 }
 ```
 
-Which should turn echo off on an AT device, returning 0.
-> 0
+Which should turn echo off on an AT device, returning 0(numeric) OK(verbose[default]).
+> OK
 
 ## Authors
 
