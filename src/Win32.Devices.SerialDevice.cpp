@@ -1,7 +1,15 @@
 //	Copyright (c) 2019 LooUQ Incorporated.
 
 //	Licensed under the GNU GPLv3. See LICENSE file in the project root for full license information.
-#include "Win32.Devices.SerialDevice.h"
+#include "../include/Win32.Devices.SerialDevice.h"
+
+#include <assert.h>
+
+#ifdef DEBUG
+#define DEBUG_ASSERT(ptr) assert(ptr)
+#else
+#define DEBUG_ASSERT(ptr)
+#endif
 
 #define NO_SHARING	NULL
 #define NO_SECURITY	NULL
@@ -15,14 +23,10 @@ namespace Win32
 	namespace Devices
 	{		
 		/**********************************************************************
-		 *	Constructor.
-		 *
-		 *	\param[in] A nullptr, representing the requested serial device was
-		 *		not available.
+		 *	Blank Constructor.
 		 */
 		SerialDevice::SerialDevice(std::nullptr_t)
-		{
-			throw std::exception("Serial Device was unavailable or not found!");
+		{			
 		}
 
 
@@ -32,16 +36,27 @@ namespace Win32
 		 *
 		 *	\param[in] A pointer to an available serial device.
 		 */
-		SerialDevice::SerialDevice(SerialDevice* serialDevicePtr)
-			: m_pComm(serialDevicePtr->m_pComm.load())
-			, m_portNum(serialDevicePtr->m_portNum)
+		SerialDevice::SerialDevice(SerialDevice&& serialDevicePtr) noexcept			
+			: m_portNum(serialDevicePtr.m_portNum)
 		{
-			serialDevicePtr->m_pComm.store(nullptr);
-			delete serialDevicePtr;
+			m_pComm.exchange(serialDevicePtr.m_pComm);
+			DEBUG_ASSERT(m_pComm.load());
 
 			config_settings();
 			config_timeouts();
 			clear_comm();
+		}
+
+		SerialDevice& SerialDevice::operator=(SerialDevice&& to_move) noexcept
+		{
+			m_pComm.exchange(to_move.m_pComm);
+			DEBUG_ASSERT(m_pComm.load());
+			m_portNum = to_move.m_portNum;
+
+			config_settings();
+			config_timeouts();
+			clear_comm();
+			return *this;
 		}
 
 
@@ -63,7 +78,7 @@ namespace Win32
 		 *		requires an input of 10.
 		 *	\returns A serial device with an initalized comm handle.
 		 */
-		SerialDevice* SerialDevice::FromPortNumber(uint16_t COMPortNum)
+		SerialDevice SerialDevice::FromPortNumber(uint16_t COMPortNum)
 		{
 			std::wstring port_dir = { L"\\\\.\\COM" + std::to_wstring(COMPortNum) };
 
@@ -76,16 +91,15 @@ namespace Win32
 				FILE_ATTRIBUTE_NORMAL,
 				NO_FLAGS
 			);
+			
 
 			if (h_sercom == INVALID_HANDLE_VALUE)
 			{
 				std::cerr << "Could not open port: COM" << COMPortNum << "!" << std::endl;
-				return nullptr;
+				
 			}
-			else
-			{										
-				return new SerialDevice(h_sercom, COMPortNum);
-			}
+
+			return SerialDevice(h_sercom, COMPortNum);
 		}
 
 
@@ -95,17 +109,17 @@ namespace Win32
 		 */
 		void SerialDevice::Close()
 		{
-			if (m_pComm != nullptr)
-			{
-				CloseHandle(m_pComm);
-				m_pComm = nullptr;
-			}				
-
 			if (m_thCommEv != nullptr)
 			{
 				delete m_thCommEv;
 				m_thCommEv = nullptr;
 			}
+
+			if (m_pComm != nullptr)
+			{
+				CloseHandle(m_pComm);
+				m_pComm = nullptr;
+			}				
 		}
 
 
@@ -159,6 +173,7 @@ namespace Win32
 		{
 			DWORD err_flags = { 0 };
 			COMSTAT com_status = { 0 };
+			DEBUG_ASSERT(m_pComm);
 			ClearCommError(m_pComm, &err_flags, &com_status);
 				
 			return com_status.cbInQue;
@@ -254,6 +269,7 @@ namespace Win32
 		void SerialDevice::write(const void* _src, size_t len)
 		{
 			DWORD written;
+			DEBUG_ASSERT(m_pComm.load());
 			WriteFile(m_pComm, _src, len, &written, NULL);
 			if (written <= 0)
 			{
@@ -283,6 +299,7 @@ namespace Win32
 			//WaitCommEvent(m_pComm, &event_mask, NULL);
 
 			DWORD read_;
+			DEBUG_ASSERT(m_pComm.load());
 			if (!ReadFile(m_pComm, _dest, len, &read_, NULL))
 			{
 				std::cerr << "Serial Error: Unable to read all bytes!" << std::endl;
@@ -298,6 +315,7 @@ namespace Win32
 		void SerialDevice::config_settings()
 		{
 			DCB data_cntrl_blk = { 0 };
+			DEBUG_ASSERT(m_pComm.load());
 			if (!GetCommState(m_pComm, &data_cntrl_blk))
 			{
 				std::cerr << "Serial Error: Unable to retrieve port settings!" << std::endl;
@@ -376,6 +394,7 @@ namespace Win32
 		void SerialDevice::config_timeouts()
 		{
 			COMMTIMEOUTS timeouts;
+			DEBUG_ASSERT(m_pComm.load());
 			//	Get default timeout settings
 			if (!GetCommTimeouts(m_pComm, &timeouts))
 			{
@@ -418,6 +437,7 @@ namespace Win32
 		 */
 		void SerialDevice::clear_comm()
 		{
+			DEBUG_ASSERT(m_pComm.load());
 			//	Clear the port
 			if (PurgeComm(m_pComm, PURGE_TXCLEAR | PURGE_RXCLEAR) == 0)
 			{
@@ -436,6 +456,7 @@ namespace Win32
 		 */
 		void SerialDevice::interrupt_thread()
 		{
+			DEBUG_ASSERT(m_pComm.load());
 			//	set the comm mask to await received character events
 			if (SetCommMask(m_pComm, EV_RXCHAR) == FALSE)
 			{
@@ -453,17 +474,22 @@ namespace Win32
 					//	check for how many characters are available
 					size_t len = Available();
 
-					//	create a destination buffer for rx chars
-					uint8_t* buf = new uint8_t[len];
+					if (len)
+					{
+						//	create a destination buffer for rx chars
+						uint8_t* buf = new uint8_t[len];
+
+						//	read data into buffer
+						read(buf, len);
+
+						//	trigger event, passing an stl string containing data
+						ReceivedData(std::string((char*)buf, len));
+
+						// recycle the buffer
+						delete[] buf;
+					}		
+
 					
-					//	read data into buffer
-					read(buf, len);
-
-					//	trigger event, passing an stl string containing data
-					ReceivedData(std::string((char*)buf, len));
-
-					// recycle the buffer
-					delete[] buf;
 				}
 			}
 		}		

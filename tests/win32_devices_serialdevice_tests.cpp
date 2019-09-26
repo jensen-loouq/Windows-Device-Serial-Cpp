@@ -15,8 +15,7 @@ namespace tests
 		
 		TEST_METHOD(OpenSerialPort)
 		{
-			SerialDevice serial_device = { SerialDevice::FromPortNumber(TestPort) };
-			//	If the constructor does not throw an exception (nullptr_t) then the test passes
+			SerialDevice serial_device = { SerialDevice::FromPortNumber(TestPort) };			
 		}
 
 
@@ -52,6 +51,7 @@ namespace tests
 			);
 
 			serial_device.Write("ATE0\r");
+			std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 			serial_device.Write("ATV0\r");
 			while (!signal)
 				;

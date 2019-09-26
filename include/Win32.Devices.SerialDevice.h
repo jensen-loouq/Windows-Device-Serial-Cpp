@@ -61,11 +61,14 @@ namespace Win32
 		struct SerialDevice	final
 		{				
 			SerialDevice(std::nullptr_t);
-			SerialDevice(SerialDevice* serialDevicePtr);
+			SerialDevice(SerialDevice&& to_move) noexcept;
+			SerialDevice& operator=(SerialDevice&& to_move) noexcept;
 
 			virtual ~SerialDevice();
 
-			static SerialDevice* FromPortNumber(uint16_t COMPortNum);
+			static SerialDevice FromPortNumber(uint16_t COMPortNum);
+
+
 
 			void Close();
 			void UsingEvents(bool usingCommEv);
