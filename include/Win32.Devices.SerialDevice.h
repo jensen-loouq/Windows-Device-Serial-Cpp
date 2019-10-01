@@ -36,6 +36,7 @@
 #include <array>
 #include <thread>
 #include <atomic>
+#include <mutex>
 
 #include <CoreZero.Event.hpp>
 
@@ -107,7 +108,9 @@ namespace Win32
 
 		private:
 			///	Native handle for sercom.
-			std::atomic<HANDLE> m_pComm = nullptr;
+			HANDLE volatile m_pComm = nullptr;
+
+			std::mutex m_critical;
 
 			///	COM port number.
 			uint16_t m_portNum = (uint16_t)-1;
@@ -119,7 +122,10 @@ namespace Win32
 			SerialByteSize m_byteSize = Byte_Size8b;
 
 			/// Handle for a thread to await comm events
-			std::thread* m_thCommEv = nullptr;
+			std::thread m_thCommEv;
+
+			///
+			std::atomic_flag m_continuePoll = ATOMIC_FLAG_INIT;
 		};
 
 

@@ -38,9 +38,10 @@ namespace Win32
 		 */
 		SerialDevice::SerialDevice(SerialDevice&& serialDevicePtr) noexcept			
 			: m_portNum(serialDevicePtr.m_portNum)
+			, m_pComm(serialDevicePtr.m_pComm)
 		{
-			m_pComm.exchange(serialDevicePtr.m_pComm);
-			DEBUG_ASSERT(m_pComm.load());
+			m_pComm = nullptr;
+			assert(m_pComm);
 
 			config_settings();
 			config_timeouts();
@@ -48,10 +49,12 @@ namespace Win32
 		}
 
 		SerialDevice& SerialDevice::operator=(SerialDevice&& to_move) noexcept
-		{
-			m_pComm.exchange(to_move.m_pComm);
-			DEBUG_ASSERT(m_pComm.load());
+		{			
+			m_pComm = to_move.m_pComm;
+			assert(m_pComm);
 			m_portNum = to_move.m_portNum;
+
+			to_move.m_pComm = nullptr;
 
 			config_settings();
 			config_timeouts();
@@ -109,11 +112,8 @@ namespace Win32
 		 */
 		void SerialDevice::Close()
 		{
-			if (m_thCommEv != nullptr)
-			{
-				delete m_thCommEv;
-				m_thCommEv = nullptr;
-			}
+			m_continuePoll.clear();
+			if (m_thCommEv.joinable()) m_thCommEv.join();
 
 			if (m_pComm != nullptr)
 			{
@@ -131,8 +131,7 @@ namespace Win32
 		 */
 		void SerialDevice::UsingEvents(bool usingCommEv)
 		{
-			m_thCommEv = new std::thread(&SerialDevice::interrupt_thread, this);
-			m_thCommEv->detach();
+			m_thCommEv = std::thread(&SerialDevice::interrupt_thread, this);			
 		}
 
 
@@ -269,7 +268,8 @@ namespace Win32
 		void SerialDevice::write(const void* _src, size_t len)
 		{
 			DWORD written;
-			DEBUG_ASSERT(m_pComm.load());
+			assert(m_pComm);
+			std::lock_guard<std::mutex> lck(m_critical);
 			WriteFile(m_pComm, _src, len, &written, NULL);
 			if (written <= 0)
 			{
@@ -299,7 +299,8 @@ namespace Win32
 			//WaitCommEvent(m_pComm, &event_mask, NULL);
 
 			DWORD read_;
-			DEBUG_ASSERT(m_pComm.load());
+			assert(m_pComm);
+			std::lock_guard<std::mutex> lck(m_critical);
 			if (!ReadFile(m_pComm, _dest, len, &read_, NULL))
 			{
 				std::cerr << "Serial Error: Unable to read all bytes!" << std::endl;
@@ -315,7 +316,10 @@ namespace Win32
 		void SerialDevice::config_settings()
 		{
 			DCB data_cntrl_blk = { 0 };
-			DEBUG_ASSERT(m_pComm.load());
+
+			assert(m_pComm);
+			std::lock_guard<std::mutex> lck(m_critical);
+
 			if (!GetCommState(m_pComm, &data_cntrl_blk))
 			{
 				std::cerr << "Serial Error: Unable to retrieve port settings!" << std::endl;
@@ -394,7 +398,9 @@ namespace Win32
 		void SerialDevice::config_timeouts()
 		{
 			COMMTIMEOUTS timeouts;
-			DEBUG_ASSERT(m_pComm.load());
+
+			assert(m_pComm);
+			std::lock_guard<std::mutex> lck(m_critical);
 			//	Get default timeout settings
 			if (!GetCommTimeouts(m_pComm, &timeouts))
 			{
@@ -437,7 +443,8 @@ namespace Win32
 		 */
 		void SerialDevice::clear_comm()
 		{
-			DEBUG_ASSERT(m_pComm.load());
+			assert(m_pComm);
+			std::lock_guard<std::mutex> lck(m_critical);
 			//	Clear the port
 			if (PurgeComm(m_pComm, PURGE_TXCLEAR | PURGE_RXCLEAR) == 0)
 			{
@@ -456,15 +463,18 @@ namespace Win32
 		 */
 		void SerialDevice::interrupt_thread()
 		{
-			DEBUG_ASSERT(m_pComm.load());
+			m_critical.lock();
 			//	set the comm mask to await received character events
 			if (SetCommMask(m_pComm, EV_RXCHAR) == FALSE)
 			{
+				m_critical.unlock();
 				std::cerr << "Serial Error: Unable to set comm mask!" << std::endl;
 			}
 			else
 			{
-				while (true)
+				m_critical.unlock();
+				m_continuePoll.test_and_set();
+				while (m_continuePoll.test_and_set())
 				{
 					DWORD event_mask = { 0 };
 
@@ -487,9 +497,7 @@ namespace Win32
 
 						// recycle the buffer
 						delete[] buf;
-					}		
-
-					
+					}							
 				}
 			}
 		}		
