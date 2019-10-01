@@ -131,6 +131,7 @@ namespace Win32
 		 */
 		void SerialDevice::UsingEvents(bool usingCommEv)
 		{
+			m_continuePoll.test_and_set();
 			m_thCommEv = std::thread(&SerialDevice::interrupt_thread, this);			
 		}
 
@@ -143,7 +144,7 @@ namespace Win32
 		 */
 		void SerialDevice::Write(const std::string& src_str)
 		{
-			write(src_str.c_str(), src_str.length());
+			win32_write(src_str.c_str(), src_str.length());
 		}
 
 
@@ -157,7 +158,7 @@ namespace Win32
 		{
 			char temp[128];
 
-			size_t len = read(temp, 128);
+			size_t len = win32_read(temp, 128);
 			dest_str = { temp, len };
 		}
 
@@ -265,22 +266,22 @@ namespace Win32
 		 *		device.
 		 *	\param[in] len The length of the source data.
 		 */
-		void SerialDevice::write(const void* _src, size_t len)
+		void SerialDevice::win32_write(const void* _src, size_t len)
 		{
 			DWORD written;
 			assert(m_pComm);
 			std::lock_guard<std::mutex> lck(m_critical);
-			WriteFile(m_pComm, _src, len, &written, NULL);
-			if (written <= 0)
+			if (!WriteFile(m_pComm, _src, len, &written, NULL))
 			{
-				std::cerr << "Serial Error: Unable to write all bytes!" << std::endl;
-			}
-			else
-			{
-				//if (SetCommMask(m_pComm, EV_RXCHAR) == FALSE)
-				//{
-				//	std::cerr << "Serial Error: Unable to set comm mask!" << std::endl;
-				//}
+				if (GetLastError() != ERROR_IO_PENDING)
+				{
+					//	[error]: write failed.
+					std::cerr << "Serial Error: Unable to write all bytes!" << std::endl;
+				}
+				else
+				{
+					//	write operation was successful
+				}
 			}
 		}
 
@@ -293,14 +294,30 @@ namespace Win32
 		 *	\param[in] len The capacity of the destination buffer.
 		 *	\returns The number of bytes read into the destination buffer.
 		 */
-		size_t SerialDevice::read(void* _dest, size_t len)
+		size_t SerialDevice::win32_read(void* _dest, size_t len)
 		{
-			//DWORD event_mask = { 0 };
-			//WaitCommEvent(m_pComm, &event_mask, NULL);
-
 			DWORD read_;
 			assert(m_pComm);
-			std::lock_guard<std::mutex> lck(m_critical);
+
+			if (!m_thCommEv.joinable())
+			{
+				//	if there isn't an interrupt thread, pend for data here
+				DWORD comm_ev = 0;
+
+				if (!SetCommMask(m_pComm, EV_RXCHAR))
+				{
+					//	[error]: could not set event.
+				}				
+
+				//	not polling on separate thread
+				if (!WaitCommEvent(m_pComm, &comm_ev, NULL))
+				{
+					return 0;
+				}
+				len = Available();
+			}
+			std::lock_guard<std::mutex> lck(m_critical);		
+
 			if (!ReadFile(m_pComm, _dest, len, &read_, NULL))
 			{
 				std::cerr << "Serial Error: Unable to read all bytes!" << std::endl;
@@ -463,41 +480,48 @@ namespace Win32
 		 */
 		void SerialDevice::interrupt_thread()
 		{
-			m_critical.lock();
 			//	set the comm mask to await received character events
-			if (SetCommMask(m_pComm, EV_RXCHAR) == FALSE)
-			{
-				m_critical.unlock();
+			if (!SetCommMask(m_pComm, EV_RXCHAR))
+			{				
 				std::cerr << "Serial Error: Unable to set comm mask!" << std::endl;
+				abort();
 			}
 			else
 			{
-				m_critical.unlock();
-				m_continuePoll.test_and_set();
+				DWORD comm_ev = 0;
+				DWORD bytes_read = 0;
 				while (m_continuePoll.test_and_set())
 				{
-					DWORD event_mask = { 0 };
 
 					//	await a received character event (win32)
-					WaitCommEvent(m_pComm, &event_mask, NULL);
-
-					//	check for how many characters are available
-					size_t len = Available();
-
-					if (len)
+					if (WaitCommEvent(m_pComm, &comm_ev, NULL))
 					{
-						//	create a destination buffer for rx chars
-						uint8_t* buf = new uint8_t[len];
+						size_t len = 0;
+						do
+						{
+							//	check for how many characters are available
+							len = Available();
+							if (len)
+							{
 
-						//	read data into buffer
-						read(buf, len);
+								//	create a destination buffer for rx chars
+								uint8_t* buf = new uint8_t[len];
 
-						//	trigger event, passing an stl string containing data
-						ReceivedData(std::string((char*)buf, len));
+								//	read data into buffer
+								bytes_read = win32_read(buf, len);
 
-						// recycle the buffer
-						delete[] buf;
-					}							
+								//	trigger event, passing an stl string containing data
+								ReceivedData(std::string((char*)buf, len));
+
+								// recycle the buffer
+								delete[] buf;
+							}					
+						} while (len && bytes_read);
+					}
+					else
+					{
+
+					}						
 				}
 			}
 		}		

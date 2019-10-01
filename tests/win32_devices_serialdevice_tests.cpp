@@ -28,7 +28,7 @@ namespace tests
 			std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 			std::string response;
 			serial_device.Read(response);
-			Assert::IsTrue(response.compare("0") == 0);	// compare returns 0 on true
+			Assert::IsTrue(response.compare("0\r") == 0);	// compare returns 0 on true
 		}
 
 		volatile int signal = { 0 };
@@ -52,8 +52,10 @@ namespace tests
 			);
 
 			serial_device.Write("ATE0\r");
-			std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-			Assert::IsTrue(signal);
+			while (!signal)
+				;
+			Assert::IsTrue(signal);			
+
 			signal = 0;
 			serial_device.Write("ATV0\r");
 			while (!signal)
