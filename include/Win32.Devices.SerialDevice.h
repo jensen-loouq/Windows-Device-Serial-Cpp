@@ -98,8 +98,8 @@ namespace Win32
 		private:
 			SerialDevice(HANDLE pSercom, uint16_t comPortNum) : m_pComm(pSercom), m_portNum(comPortNum) {}
 
-			void write(const void* _src, size_t len);
-			size_t read(void* _dest, size_t len);
+			void win32_write(const void* _src, size_t len);
+			size_t win32_read(void* _dest, size_t len);
 			void config_settings();
 			void config_timeouts();
 			void clear_comm();
@@ -110,7 +110,7 @@ namespace Win32
 			///	Native handle for sercom.
 			HANDLE volatile m_pComm = nullptr;
 
-			std::mutex m_critical;
+			OVERLAPPED m_SerialStatus = { 0 };
 
 			///	COM port number.
 			uint16_t m_portNum = (uint16_t)-1;
@@ -132,7 +132,7 @@ namespace Win32
 		template<typename T, unsigned N>
 		inline void SerialDevice::Write(const std::array<T, N>& src_ary)
 		{
-			write(src_ary.data, N);
+			win32_write(src_ary.data, N);
 		}
 
 
