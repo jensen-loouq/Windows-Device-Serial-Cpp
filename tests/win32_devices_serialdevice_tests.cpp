@@ -15,8 +15,7 @@ namespace tests
 		
 		TEST_METHOD(OpenSerialPort)
 		{
-			SerialDevice serial_device = { SerialDevice::FromPortNumber(TestPort) };
-			//	If the constructor does not throw an exception (nullptr_t) then the test passes
+			SerialDevice serial_device = { SerialDevice::FromPortNumber(TestPort) };			
 		}
 
 
@@ -29,29 +28,35 @@ namespace tests
 			std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 			std::string response;
 			serial_device.Read(response);
-			Assert::IsTrue(response.compare("0") == 0);	// compare returns 0 on true
+			Assert::IsTrue(response.compare("0\r") == 0);	// compare returns 0 on true
+		}
+
+		volatile int signal = { 0 };
+
+		void HandleRxData(std::string rx_data)
+		{
+			Logger::WriteMessage(rx_data.c_str());
+			signal = 1;
 		}
 
 
 		TEST_METHOD(SendEvRx)
 		{
-			volatile int signal = { 0 };
-			auto HandleRxData = [&signal](std::string rx_data) -> void
-			{
-				Logger::WriteMessage(rx_data.c_str());
-				signal = 1;
-			};
-
 			SerialDevice serial_device = { SerialDevice::FromPortNumber(TestPort) };
 			serial_device.BaudRate(TestBuadRate);
 
 			serial_device.UsingEvents(true);
 			serial_device.ReceivedData += CoreZero::Create_MemberDelegate(
-				HandleRxData,
-				&decltype(HandleRxData)::operator()
+				this,
+				&Test_SerialDevice::HandleRxData
 			);
 
 			serial_device.Write("ATE0\r");
+			while (!signal)
+				;
+			Assert::IsTrue(signal);			
+
+			signal = 0;
 			serial_device.Write("ATV0\r");
 			while (!signal)
 				;

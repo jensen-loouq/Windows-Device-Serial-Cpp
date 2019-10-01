@@ -36,6 +36,7 @@
 #include <array>
 #include <thread>
 #include <atomic>
+#include <mutex>
 
 #include <CoreZero.Event.hpp>
 
@@ -61,11 +62,14 @@ namespace Win32
 		struct SerialDevice	final
 		{				
 			SerialDevice(std::nullptr_t);
-			SerialDevice(SerialDevice* serialDevicePtr);
+			SerialDevice(SerialDevice&& to_move) noexcept;
+			SerialDevice& operator=(SerialDevice&& to_move) noexcept;
 
 			virtual ~SerialDevice();
 
-			static SerialDevice* FromPortNumber(uint16_t COMPortNum);
+			static SerialDevice FromPortNumber(uint16_t COMPortNum);
+
+
 
 			void Close();
 			void UsingEvents(bool usingCommEv);
@@ -94,8 +98,8 @@ namespace Win32
 		private:
 			SerialDevice(HANDLE pSercom, uint16_t comPortNum) : m_pComm(pSercom), m_portNum(comPortNum) {}
 
-			void write(const void* _src, size_t len);
-			size_t read(void* _dest, size_t len);
+			void win32_write(const void* _src, size_t len);
+			size_t win32_read(void* _dest, size_t len);
 			void config_settings();
 			void config_timeouts();
 			void clear_comm();
@@ -104,7 +108,9 @@ namespace Win32
 
 		private:
 			///	Native handle for sercom.
-			std::atomic<HANDLE> m_pComm = nullptr;
+			HANDLE volatile m_pComm = nullptr;
+
+			std::mutex m_critical;
 
 			///	COM port number.
 			uint16_t m_portNum = (uint16_t)-1;
@@ -116,14 +122,17 @@ namespace Win32
 			SerialByteSize m_byteSize = Byte_Size8b;
 
 			/// Handle for a thread to await comm events
-			std::thread* m_thCommEv = nullptr;
+			std::thread m_thCommEv;
+
+			///
+			std::atomic_flag m_continuePoll = ATOMIC_FLAG_INIT;
 		};
 
 
 		template<typename T, unsigned N>
 		inline void SerialDevice::Write(const std::array<T, N>& src_ary)
 		{
-			write(src_ary.data, N);
+			win32_write(src_ary.data, N);
 		}
 
 

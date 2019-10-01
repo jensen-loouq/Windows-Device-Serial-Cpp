@@ -20,7 +20,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\src\Win32.Devices.SerialDevice.h">
+    <ClInclude Include="..\include\Win32.Devices.SerialDevice.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
