@@ -16,6 +16,8 @@
 #define NON_OVERLAPPED_IO	NULL
 #define NO_FLAGS	NULL
 
+#define SW_BUFFER_SIZE		(0xFFul)
+
 
 
 namespace Win32
@@ -49,16 +51,18 @@ namespace Win32
 		}
 
 		SerialDevice& SerialDevice::operator=(SerialDevice&& to_move) noexcept
-		{			
-			m_pComm = to_move.m_pComm;
-			assert(m_pComm);
-			m_portNum = to_move.m_portNum;
+		{	
+			if (&to_move != this)
+			{
+				std::exchange(m_pComm, to_move.m_pComm);
+				std::exchange(m_portNum, to_move.m_portNum);
+				assert(m_pComm);
 
-			to_move.m_pComm = nullptr;
+				config_settings();
+				config_timeouts();
+				clear_comm();
+			}
 
-			config_settings();
-			config_timeouts();
-			clear_comm();
 			return *this;
 		}
 
@@ -83,23 +87,25 @@ namespace Win32
 		 */
 		SerialDevice SerialDevice::FromPortNumber(uint16_t COMPortNum)
 		{
+			//	prepend COM directory
 			std::wstring port_dir = { L"\\\\.\\COM" + std::to_wstring(COMPortNum) };
 
+			//	create the handle to the COM port
 			HANDLE h_sercom	= CreateFile(
 				port_dir.c_str(),
-				GENERIC_READ | GENERIC_WRITE,
-				NO_SHARING,
-				NO_SECURITY,
-				OPEN_EXISTING,
-				FILE_ATTRIBUTE_NORMAL,
-				NO_FLAGS
+				GENERIC_READ | GENERIC_WRITE,	// Open for reading and writing
+				NO_SHARING,						// No Sharing of the COM port
+				NO_SECURITY,					// No security necessary on COM port
+				OPEN_EXISTING,					// Open an existing port
+				FILE_FLAG_OVERLAPPED,			// Use overlapped operations
+				NO_FLAGS						// No other flags
 			);
 			
 
 			if (h_sercom == INVALID_HANDLE_VALUE)
 			{
-				std::cerr << "Could not open port: COM" << COMPortNum << "!" << std::endl;
-				
+				std::cerr << "Could not open port: COM" << COMPortNum << "!" << std::endl;			
+				throw std::exception("No COM HANDLE");
 			}
 
 			return SerialDevice(h_sercom, COMPortNum);
@@ -123,6 +129,7 @@ namespace Win32
 		}
 
 
+
 		/**********************************************************************
 		 *	Tell the serial device to use a separate thread for awaiting events
 		 *		from the comm.
@@ -136,17 +143,18 @@ namespace Win32
 		}
 
 
-		/**********************************************************************
-		 *	Defer closing the serial device for a specified amount of time to
-		 *		ensure reception of all data from pending writes.
-		 *
-		 *	\param _timeInMillis The time to defer for in milliseconds.
-		 */
-		void SerialDevice::DeferClose(std::chrono::milliseconds _timeInMillis)
-		{
-			std::this_thread::sleep_for(_timeInMillis);
-			m_continuePoll.clear();
 
+		/**********************************************************************
+		 *	Defer operations to allow the working thread to process any pending
+		 *		data coming in. Useful only when $UsingEvents.
+		 *
+		 *	\param[in] deferMillis The amount of milliseconds to defer the
+		 *		ending of the worker thread.
+		 */
+		void SerialDevice::Defer(std::chrono::milliseconds deferMillis)
+		{
+			std::this_thread::sleep_for(deferMillis);
+			m_continuePoll.clear();
 		}
 
 
@@ -156,9 +164,9 @@ namespace Win32
 		 *
 		 *	\param[in] src_string The string containing source data.
 		 */
-		void SerialDevice::Write(const std::string& src_str)
+		size_t SerialDevice::Write(const std::string& src_str)
 		{
-			win32_write(src_str.c_str(), src_str.length());
+			return win32_write(src_str.c_str(), src_str.length());
 		}
 
 
@@ -168,12 +176,13 @@ namespace Win32
 		 *
 		 *	\param[out] dest_str The string designating the received data.
 		 */
-		void SerialDevice::Read(std::string& dest_str)
+		size_t SerialDevice::Read(std::string& dest_str)
 		{
 			char temp[128];
 
 			size_t len = win32_read(temp, 128);
 			dest_str = { temp, len };
+			return len;
 		}
 
 
@@ -280,22 +289,41 @@ namespace Win32
 		 *		device.
 		 *	\param[in] len The length of the source data.
 		 */
-		void SerialDevice::win32_write(const void* _src, size_t len)
+		size_t SerialDevice::win32_write(const void* _src, size_t len)
 		{
-			DWORD written;
-			assert(m_pComm);
-			std::lock_guard<std::mutex> lck(m_critical);
-			if (!WriteFile(m_pComm, _src, len, &written, NULL))
+			OVERLAPPED os_writer = { 0 };
+			DWORD bytes_written = 0;
+			
+			os_writer.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+			assert(os_writer.hEvent != NULL);
+
+			if (!WriteFile(m_pComm, _src, len, &bytes_written, &os_writer))
 			{
 				if (GetLastError() != ERROR_IO_PENDING)
 				{
-					//	[error]: write failed.
-					std::cerr << "Serial Error: Unable to write all bytes!" << std::endl;
+					//	[error]: write operation has failed
+					return 0;
 				}
 				else
 				{
-					//	write operation was successful
+					//	a write operation has been issued
+					if (!GetOverlappedResult(m_pComm, &os_writer, &bytes_written, TRUE))
+					{
+						//	[error]: write operation has failed
+						return 0;
+					}
+					else
+					{	//	immediate
+						//	the write operation has completed successfully
+						return bytes_written;
+					}
 				}
+			}
+			else
+			{
+				//	immediate success
+				//	the write operation has completed successfully
+				return bytes_written;
 			}
 		}
 
@@ -308,35 +336,67 @@ namespace Win32
 		 *	\param[in] len The capacity of the destination buffer.
 		 *	\returns The number of bytes read into the destination buffer.
 		 */
-		size_t SerialDevice::win32_read(void* _dest, size_t len)
+		size_t SerialDevice::win32_read(void* _dest, size_t len, DWORD readTimeout)
 		{
-			DWORD read_;
-			assert(m_pComm);
+			OVERLAPPED os_reader = { 0 };
+			DWORD bytes_read = 0;
 
-			if (!m_thCommEv.joinable())
+			os_reader.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+			assert(os_reader.hEvent != NULL);
+
+			if (!m_ReadOpPending)
 			{
-				//	if there isn't an interrupt thread, pend for data here
-				DWORD comm_ev = 0;
-
-				if (!SetCommMask(m_pComm, EV_RXCHAR))
+				if (!ReadFile(m_pComm, _dest, len, &bytes_read, &os_reader))
 				{
-					//	[error]: could not set event.
-				}				
-
-				//	not polling on separate thread
-				if (!WaitCommEvent(m_pComm, &comm_ev, NULL))
-				{
-					return 0;
+					if (GetLastError() != ERROR_IO_PENDING)
+					{
+						//	[error]: could not issue read operation
+						return 0;
+					}
+					else
+					{
+						//	read operation issued
+						m_ReadOpPending = TRUE;
+					}
 				}
-				len = Available();
+				else
+				{
+					//	read operation finished
+					m_ReadOpPending = FALSE;
+					return bytes_read;
+				}
 			}
-			std::lock_guard<std::mutex> lck(m_critical);		
 
-			if (!ReadFile(m_pComm, _dest, len, &read_, NULL))
+
+			DWORD object_result;
+
+			if (m_ReadOpPending)
 			{
-				std::cerr << "Serial Error: Unable to read all bytes!" << std::endl;
+				object_result = WaitForSingleObject(os_reader.hEvent, readTimeout);
+				switch (object_result)
+				{
+				case WAIT_OBJECT_0:
+					if (!GetOverlappedResult(m_pComm, &os_reader, &bytes_read, FALSE))
+					{
+						//	[error]: in communications
+						return 0;
+					}
+					else
+					{						
+						//	read operation finished
+						m_ReadOpPending = FALSE;
+						return bytes_read;
+					}
+					break;
+
+				case WAIT_TIMEOUT:
+					break;
+
+				default:
+					break;
+				}
 			}
-			return read_;
+			return 0;
 		}
 
 
@@ -348,8 +408,7 @@ namespace Win32
 		{
 			DCB data_cntrl_blk = { 0 };
 
-			assert(m_pComm);
-			std::lock_guard<std::mutex> lck(m_critical);
+			assert(m_pComm);			
 
 			if (!GetCommState(m_pComm, &data_cntrl_blk))
 			{
@@ -431,7 +490,7 @@ namespace Win32
 			COMMTIMEOUTS timeouts;
 
 			assert(m_pComm);
-			std::lock_guard<std::mutex> lck(m_critical);
+			
 			//	Get default timeout settings
 			if (!GetCommTimeouts(m_pComm, &timeouts))
 			{
@@ -475,7 +534,7 @@ namespace Win32
 		void SerialDevice::clear_comm()
 		{
 			assert(m_pComm);
-			std::lock_guard<std::mutex> lck(m_critical);
+			
 			//	Clear the port
 			if (PurgeComm(m_pComm, PURGE_TXCLEAR | PURGE_RXCLEAR) == 0)
 			{
@@ -494,51 +553,103 @@ namespace Win32
 		 */
 		void SerialDevice::interrupt_thread()
 		{
-			//	set the comm mask to await received character events
 			if (!SetCommMask(m_pComm, EV_RXCHAR))
-			{				
-				std::cerr << "Serial Error: Unable to set comm mask!" << std::endl;
+			{
 				abort();
 			}
 			else
-			{
-				DWORD comm_ev = 0;
-				DWORD bytes_read = 0;
+			{				
+				uint8_t* input_buffer = new uint8_t[SW_BUFFER_SIZE];
+				OVERLAPPED serial_status = { 0 };
+				BOOL stat_check_issued = FALSE;
+				DWORD comm_event;
+				DWORD pending_object;
+				DWORD ov_res;
+
+				serial_status.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+				assert(serial_status.hEvent != NULL);
+
 				while (m_continuePoll.test_and_set())
 				{
-
-					//	await a received character event (win32)
-					if (WaitCommEvent(m_pComm, &comm_ev, NULL))
+					//	check for a previously issued status check
+					if (!stat_check_issued)
 					{
-						size_t len = 0;
-						do
+						//	issue a check for status
+						if (!WaitCommEvent(m_pComm, &comm_event, &serial_status))
 						{
-							//	check for how many characters are available
-							len = Available();
-							if (len)
+							// did not return immediately, check for pending check
+							if (GetLastError() == ERROR_IO_PENDING)
 							{
-
-								//	create a destination buffer for rx chars
-								uint8_t* buf = new uint8_t[len];
-
-								//	read data into buffer
-								bytes_read = win32_read(buf, len);
-
-								//	trigger event, passing an stl string containing data
-								ReceivedData(std::string((char*)buf, len));
-
-								// recycle the buffer
-								delete[] buf;
-							}					
-						} while (len && bytes_read);
+								stat_check_issued = TRUE;
+							}
+							else
+							{
+								//	could not issue a status check
+								stat_check_issued = FALSE;
+							}
+						}
+						else
+						{
+							// returned immediately
+							handle_data();
+						}
 					}
-					else
-					{
 
-					}						
+					//	handle an issued status check
+					if (stat_check_issued)
+					{
+						pending_object = WaitForSingleObject(serial_status.hEvent, 500);
+
+						switch (pending_object)
+						{
+						case WAIT_OBJECT_0:
+							if (!GetOverlappedResult(m_pComm, &serial_status, &ov_res, FALSE))
+							{
+								//	[error]: in overlapped operation
+							}
+							else
+							{
+								handle_data();
+							}
+							stat_check_issued = FALSE;
+							break;
+
+
+						case WAIT_TIMEOUT:
+							//	operation pending
+							break;
+
+
+						default:
+							break;
+						}
+					}
 				}
+
+				//	recycle the buffer
+				delete[] input_buffer;
 			}
-		}		
+		}
+
+
+
+		/**********************************************************************
+		 *	Handle data received on the port.
+		 *
+		 *	This method is to be called by the worker thread for checking the
+		 *		RX data, reading it into a buffer, and raising an event.
+		 */
+		void SerialDevice::handle_data()
+		{
+			size_t _available = Available();
+			if (_available)
+			{
+				uint8_t* _buf = new uint8_t[_available];
+				win32_read(_buf, _available);
+				ReceivedData(std::string((char*)_buf, _available));
+				delete[] _buf;
+			}
+		}
 	}
 }
 

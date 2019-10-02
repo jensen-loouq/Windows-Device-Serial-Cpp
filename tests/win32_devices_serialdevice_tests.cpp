@@ -25,8 +25,9 @@ namespace tests
 			SerialDevice serial_device = { SerialDevice::FromPortNumber(TestPort) };
 
 			serial_device.BaudRate(TestBuadRate);
-			serial_device.Write("ATE0\r");
-			std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+			size_t chars_written = serial_device.Write("ATE0\r");
+			Assert::AreEqual(5u, chars_written);
+			
 			std::string response;
 			serial_device.Read(response);
 			Logger::WriteMessage(response.c_str());
@@ -55,13 +56,13 @@ namespace tests
 
 			std::this_thread::sleep_for(1000ms);
 
-			serial_device.Write("ATE0\r");
+			Assert::AreEqual(5u, serial_device.Write("ATE0\r"));
 			while (!signal)
 				;
-			Assert::IsTrue(signal);			
+			Assert::IsTrue(signal);
 
 			signal = 0;
-			serial_device.Write("ATV0\r");
+			Assert::AreEqual(5u, serial_device.Write("ATV0\r"));
 			while (!signal)
 				;
 			Assert::IsTrue(signal);
@@ -79,12 +80,12 @@ namespace tests
 				&Test_SerialDevice::HandleRxData
 			);
 
-			serial_device.Write("ATE0\r");
-			serial_device.Write("ATV0\r");
-			serial_device.Write("AT+GSN\r");
-			serial_device.Write("ATI\r");
-			
-			//serial_device.DeferClose(1000ms);
+			Assert::AreEqual(5u, serial_device.Write("ATE0\r"));
+			Assert::AreEqual(5u, serial_device.Write("ATV0\r"));
+			Assert::AreEqual(7u, serial_device.Write("AT+GSN\r"));
+			Assert::AreEqual(4u, serial_device.Write("ATI\r"));
+
+			serial_device.Defer(1000ms);
 		}
 	};
 }

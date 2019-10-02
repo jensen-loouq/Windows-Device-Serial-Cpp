@@ -58,6 +58,7 @@ namespace Win32
 		} SerialStopBits;
 
 		using OnRxData = CoreZero::Delegate<void(std::string)>;
+		//using OnRxChar = CoreZero::Delegate<void()>;
 
 		struct SerialDevice	final
 		{				
@@ -73,15 +74,15 @@ namespace Win32
 
 			void Close();
 			void UsingEvents(bool usingCommEv);
-			void DeferClose(std::chrono::milliseconds _timeInMillis);			
+			void Defer(std::chrono::milliseconds deferMillis);
 
 			template <typename T, unsigned N>
-			void Write(const std::array<T, N>& src_ary);
-			void Write(const std::string& src_str);
+			size_t Write(const std::array<T, N>& src_ary);
+			size_t Write(const std::string& src_str);
 
 			template <typename T, unsigned N>
-			void Read(std::array<T, N>& dest_ary);
-			void Read(std::string& dest_str);
+			size_t Read(std::array<T, N>& dest_ary);
+			size_t Read(std::string& dest_str);
 
 			uint32_t Available();
 
@@ -99,19 +100,21 @@ namespace Win32
 		private:
 			SerialDevice(HANDLE pSercom, uint16_t comPortNum) : m_pComm(pSercom), m_portNum(comPortNum) {}
 
-			void win32_write(const void* _src, size_t len);
-			size_t win32_read(void* _dest, size_t len);
+			size_t win32_write(const void* _src, size_t len);
+			size_t win32_read(void* _dest, size_t len, DWORD readTimeout = INFINITE);
+
 			void config_settings();
 			void config_timeouts();
 			void clear_comm();
 
 			void interrupt_thread();
+			void handle_data();
 
 		private:
 			///	Native handle for sercom.
 			HANDLE volatile m_pComm = nullptr;
 
-			std::mutex m_critical;
+			BOOL m_ReadOpPending = FALSE;
 
 			///	COM port number.
 			uint16_t m_portNum = (uint16_t)-1;
@@ -131,16 +134,16 @@ namespace Win32
 
 
 		template<typename T, unsigned N>
-		inline void SerialDevice::Write(const std::array<T, N>& src_ary)
+		inline size_t SerialDevice::Write(const std::array<T, N>& src_ary)
 		{
-			win32_write(src_ary.data, N);
+			return win32_write(src_ary.data, N);
 		}
 
 
 		template<typename T, unsigned N>
-		inline void SerialDevice::Read(std::array<T, N>& dest_ary)
+		inline size_t SerialDevice::Read(std::array<T, N>& dest_ary)
 		{
-
+			return 0;
 		}
 	}
 }
