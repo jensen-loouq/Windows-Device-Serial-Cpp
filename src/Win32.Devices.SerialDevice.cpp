@@ -136,6 +136,20 @@ namespace Win32
 		}
 
 
+		/**********************************************************************
+		 *	Defer closing the serial device for a specified amount of time to
+		 *		ensure reception of all data from pending writes.
+		 *
+		 *	\param _timeInMillis The time to defer for in milliseconds.
+		 */
+		void SerialDevice::DeferClose(std::chrono::milliseconds _timeInMillis)
+		{
+			std::this_thread::sleep_for(_timeInMillis);
+			m_continuePoll.clear();
+
+		}
+
+
 
 		/**********************************************************************
 		 *	Write a stl string to the serial device.

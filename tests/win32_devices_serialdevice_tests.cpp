@@ -3,6 +3,7 @@
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 using namespace Win32::Devices;
+using namespace std::chrono_literals;
 
 constexpr int TestPort = 12;
 constexpr uint32_t TestBuadRate = CBR_115200;
@@ -28,6 +29,7 @@ namespace tests
 			std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 			std::string response;
 			serial_device.Read(response);
+			Logger::WriteMessage(response.c_str());
 			Assert::IsTrue(response.compare("0\r") == 0);	// compare returns 0 on true
 		}
 
@@ -50,6 +52,8 @@ namespace tests
 				this,
 				&Test_SerialDevice::HandleRxData
 			);
+
+			std::this_thread::sleep_for(1000ms);
 
 			serial_device.Write("ATE0\r");
 			while (!signal)
@@ -79,6 +83,8 @@ namespace tests
 			serial_device.Write("ATV0\r");
 			serial_device.Write("AT+GSN\r");
 			serial_device.Write("ATI\r");
+			
+			//serial_device.DeferClose(1000ms);
 		}
 	};
 }
