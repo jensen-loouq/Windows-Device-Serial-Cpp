@@ -3,6 +3,7 @@
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 using namespace Win32::Devices;
+using namespace std::chrono_literals;
 
 constexpr int TestPort = 12;
 constexpr uint32_t TestBuadRate = CBR_115200;
@@ -24,11 +25,13 @@ namespace tests
 			SerialDevice serial_device = { SerialDevice::FromPortNumber(TestPort) };
 
 			serial_device.BaudRate(TestBuadRate);
-			serial_device.Write("ATE0\r");
-			std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+			size_t chars_written = serial_device.Write("ATE0\r");
+			Assert::AreEqual(5u, chars_written);
+			
 			std::string response;
 			serial_device.Read(response);
-			Assert::IsTrue(response.compare("0") == 0);	// compare returns 0 on true
+			Logger::WriteMessage(response.c_str());
+			Assert::IsTrue(response.compare("0\r") == 0);	// compare returns 0 on true
 		}
 
 		volatile int signal = { 0 };
@@ -52,7 +55,7 @@ namespace tests
 			);
 
 			serial_device.Write("ATE0\r");
-			std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+			std::this_thread::sleep_for(1000ms);
 			Assert::IsTrue(signal);
 			signal = 0;
 			serial_device.Write("ATV0\r");
