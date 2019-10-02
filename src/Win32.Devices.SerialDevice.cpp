@@ -42,7 +42,8 @@ namespace Win32
 			: m_portNum(serialDevicePtr.m_portNum)
 			, m_pComm(serialDevicePtr.m_pComm)
 		{
-			m_pComm = nullptr;
+			serialDevicePtr.m_pComm = nullptr;
+			serialDevicePtr.m_portNum = 0;
 			assert(m_pComm);
 
 			config_settings();
@@ -54,8 +55,11 @@ namespace Win32
 		{	
 			if (&to_move != this)
 			{
-				std::exchange(m_pComm, to_move.m_pComm);
-				std::exchange(m_portNum, to_move.m_portNum);
+				m_portNum = to_move.m_portNum;
+				to_move.m_portNum = 0;
+
+				m_pComm = to_move.m_pComm;
+				to_move.m_pComm = nullptr;
 				assert(m_pComm);
 
 				config_settings();
@@ -555,6 +559,11 @@ namespace Win32
 		{
 			if (!SetCommMask(m_pComm, EV_RXCHAR))
 			{
+#ifdef DEBUG
+				DWORD err = GetLastError();
+				std::cerr << std::to_string(err) << std::endl;
+#endif // DEBUG
+
 				abort();
 			}
 			else
