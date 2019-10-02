@@ -129,6 +129,7 @@ namespace Win32
 		}
 
 
+
 		/**********************************************************************
 		 *	Tell the serial device to use a separate thread for awaiting events
 		 *		from the comm.
@@ -139,6 +140,21 @@ namespace Win32
 		{
 			m_continuePoll.test_and_set();
 			m_thCommEv = std::thread(&SerialDevice::interrupt_thread, this);			
+		}
+
+
+
+		/**********************************************************************
+		 *	Defer operations to allow the working thread to process any pending
+		 *		data coming in. Useful only when $UsingEvents.
+		 *
+		 *	\param[in] deferMillis The amount of milliseconds to defer the
+		 *		ending of the worker thread.
+		 */
+		void SerialDevice::Defer(std::chrono::milliseconds deferMillis)
+		{
+			std::this_thread::sleep_for(deferMillis);
+			m_continuePoll.clear();
 		}
 
 
@@ -555,16 +571,10 @@ namespace Win32
 
 				while (m_continuePoll.test_and_set())
 				{
-					////	read data into buffer
-					//size_t bytes_read = win32_read(input_buffer, SW_BUFFER_SIZE, 500);
-					//if (bytes_read)
-					//{
-					//	//	trigger event, passing an stl string containing data
-					//	ReceivedData(std::string((char*)input_buffer, bytes_read));
-					//}
-					
+					//	check for a previously issued status check
 					if (!stat_check_issued)
 					{
+						//	issue a check for status
 						if (!WaitCommEvent(m_pComm, &comm_event, &serial_status))
 						{
 							// did not return immediately, check for pending check
@@ -582,10 +592,10 @@ namespace Win32
 						{
 							// returned immediately
 							handle_data();
-
 						}
 					}
 
+					//	handle an issued status check
 					if (stat_check_issued)
 					{
 						pending_object = WaitForSingleObject(serial_status.hEvent, 500);
@@ -620,6 +630,15 @@ namespace Win32
 				delete[] input_buffer;
 			}
 		}
+
+
+
+		/**********************************************************************
+		 *	Handle data received on the port.
+		 *
+		 *	This method is to be called by the worker thread for checking the
+		 *		RX data, reading it into a buffer, and raising an event.
+		 */
 		void SerialDevice::handle_data()
 		{
 			size_t _available = Available();

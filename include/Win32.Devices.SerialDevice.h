@@ -74,6 +74,7 @@ namespace Win32
 
 			void Close();
 			void UsingEvents(bool usingCommEv);
+			void Defer(std::chrono::milliseconds deferMillis);
 
 			template <typename T, unsigned N>
 			size_t Write(const std::array<T, N>& src_ary);
