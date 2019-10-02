@@ -85,22 +85,25 @@ namespace Win32
 		 */
 		SerialDevice SerialDevice::FromPortNumber(uint16_t COMPortNum)
 		{
+			//	prepend COM directory
 			std::wstring port_dir = { L"\\\\.\\COM" + std::to_wstring(COMPortNum) };
 
+			//	create the handle to the COM port
 			HANDLE h_sercom	= CreateFile(
 				port_dir.c_str(),
-				GENERIC_READ | GENERIC_WRITE,
-				NO_SHARING,
-				NO_SECURITY,
-				OPEN_EXISTING,
-				FILE_FLAG_OVERLAPPED,
-				NO_FLAGS
+				GENERIC_READ | GENERIC_WRITE,	// Open for reading and writing
+				NO_SHARING,						// No Sharing of the COM port
+				NO_SECURITY,					// No security necessary on COM port
+				OPEN_EXISTING,					// Open an existing port
+				FILE_FLAG_OVERLAPPED,			// Use overlapped operations
+				NO_FLAGS						// No other flags
 			);
 			
 
 			if (h_sercom == INVALID_HANDLE_VALUE)
 			{
-				std::cerr << "Could not open port: COM" << COMPortNum << "!" << std::endl;				
+				std::cerr << "Could not open port: COM" << COMPortNum << "!" << std::endl;			
+				throw std::exception("No COM HANDLE");
 			}
 
 			return SerialDevice(h_sercom, COMPortNum);
@@ -159,7 +162,7 @@ namespace Win32
 		{
 			char temp[128];
 
-			size_t len = win32_read_async(temp, 128);
+			size_t len = win32_read(temp, 128);
 			dest_str = { temp, len };
 		}
 
