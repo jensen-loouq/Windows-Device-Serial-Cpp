@@ -74,11 +74,11 @@ namespace tests
 			SerialDevice serial_device = { SerialDevice::FromPortNumber(TestPort) };
 			serial_device.BaudRate(TestBuadRate);
 
-			serial_device.UsingEvents(true);
 			serial_device.ReceivedData += CoreZero::Create_MemberDelegate(
 				this,
 				&Test_SerialDevice::HandleRxData
 			);
+			serial_device.UsingEvents(true);
 
 			Assert::AreEqual(5u, serial_device.Write("ATE0\r"));
 			Assert::AreEqual(5u, serial_device.Write("ATV0\r"));
