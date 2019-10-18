@@ -38,7 +38,7 @@
 #include <atomic>
 #include <mutex>
 
-#include <CoreZero.Event.hpp>
+#include <corezero/event.hpp>
 
 namespace Win32
 {
@@ -57,7 +57,7 @@ namespace Win32
 			StopBits_2 = TWOSTOPBITS
 		} SerialStopBits;
 
-		using OnRxData = CoreZero::Delegate<void(std::string)>;
+		using OnRxData = corezero::Delegate<void(std::string)>;
 		//using OnRxChar = CoreZero::Delegate<void()>;
 
 		struct SerialDevice	final
@@ -95,7 +95,7 @@ namespace Win32
 			void ByteSize(SerialByteSize byteSize);
 			SerialByteSize ByteSize() const;
 
-			CoreZero::Event<OnRxData> ReceivedData;
+			corezero::Event<OnRxData> ReceivedData;
 
 		private:
 			SerialDevice(HANDLE pSercom, uint16_t comPortNum) : m_pComm(pSercom), m_portNum(comPortNum) {}
