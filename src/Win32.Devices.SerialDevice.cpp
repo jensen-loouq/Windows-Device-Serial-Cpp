@@ -51,6 +51,13 @@ namespace Win32
 			clear_comm();
 		}
 
+
+
+		/**********************************************************************
+		 *	Move assignment, for runtime purposes.
+		 *
+		 *	\paramp[in] to_move The SerialDevice instantiated at runtime.
+		 */
 		SerialDevice& SerialDevice::operator=(SerialDevice&& to_move) noexcept
 		{	
 			if (&to_move != this)
