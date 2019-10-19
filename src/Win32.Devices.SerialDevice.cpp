@@ -1,7 +1,7 @@
 //	Copyright (c) 2019 LooUQ Incorporated.
 
 //	Licensed under the GNU GPLv3. See LICENSE file in the project root for full license information.
-#include "../include/Win32.Devices.SerialDevice.h"
+#include "Win32.Devices.SerialDevice.hpp"
 
 #include <assert.h>
 
@@ -457,7 +457,7 @@ namespace Win32
 				data_cntrl_blk.BaudRate = m_baudrate;
 
 				//	Set byte size
-				data_cntrl_blk.ByteSize = m_byteSize;
+				data_cntrl_blk.ByteSize = (BYTE)m_byteSize;
 
 				//	Set stop bits
 				data_cntrl_blk.StopBits = ONESTOPBIT;
@@ -578,7 +578,7 @@ namespace Win32
 				uint8_t* input_buffer = new uint8_t[SW_BUFFER_SIZE];
 				OVERLAPPED serial_status = { 0 };
 				BOOL stat_check_issued = FALSE;
-				DWORD comm_event;
+				DWORD comm_event = { 0 };
 				DWORD pending_object;
 				DWORD ov_res;
 
