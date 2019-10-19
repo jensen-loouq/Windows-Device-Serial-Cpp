@@ -17,19 +17,19 @@ namespace tests
 	}
 
 
-	TEST(SerialDeviceTest, SendAndRecv)
-	{
-		SerialDevice serial_device = { SerialDevice::FromPortNumber(TestPort) };
+	//TEST(SerialDeviceTest, SendAndRecv)
+	//{
+	//	SerialDevice serial_device = { SerialDevice::FromPortNumber(TestPort) };
 
-		serial_device.BaudRate(TestBuadRate);
-		size_t chars_written = serial_device.Write("ATE0\r");
-		ASSERT_EQ(5u, chars_written);
-			
-		std::string response;
-		serial_device.Read(response);
-		//Logger::WriteMessage(response.c_str());
-		ASSERT_TRUE(response.compare("0\r") == 0);	// compare returns 0 on true
-	}
+	//	serial_device.BaudRate(TestBuadRate);
+	//	size_t chars_written = serial_device.Write("ATE0\r");
+	//	ASSERT_EQ(5u, chars_written);
+	//		
+	//	std::string response;
+	//	serial_device.Read(response);
+	//	//Logger::WriteMessage(response.c_str());
+	//	ASSERT_TRUE(response.compare("0\r") == 0);	// compare returns 0 on true
+	//}
 
 	volatile int signal = { 0 };
 
