@@ -36,7 +36,6 @@
 #include <array>
 #include <thread>
 #include <atomic>
-#include <mutex>
 
 #include <corezero/event.hpp>
 
@@ -44,22 +43,30 @@ namespace Win32
 {
 	namespace Devices
 	{
-		typedef enum
+		/// The number of bits per byte.
+		enum class SerialByteSize
 		{
-			Byte_Size7b = 7,
-			Byte_Size8b = 8
-		} SerialByteSize;
+			Byte_Size7b = 7,	///< 7 bits per byte.
+			Byte_Size8b = 8		///< 8 bits per byte.
+		};
 
-		typedef enum
+
+		/// The number of stop bits per transaction.
+		enum class SerialStopBits
 		{			
-			StopBits_1 = ONESTOPBIT,
-			StopBits_1_5 = ONE5STOPBITS,
-			StopBits_2 = TWOSTOPBITS
-		} SerialStopBits;
+			StopBits_1 = ONESTOPBIT,		///< 1 stop bit.
+			StopBits_1_5 = ONE5STOPBITS,	///< 1.5 stop bits.
+			StopBits_2 = TWOSTOPBITS		///< 2 stop bits.
+		};
 
-		using OnRxData = corezero::Delegate<void(std::string)>;
-		//using OnRxChar = CoreZero::Delegate<void()>;
+		///	Handler signature for data in reciever.
+		using OnRxData = corezero::Delegate<void(std::string)>;		
 
+
+
+		///	A windows serial device.
+		///	A modern c++ wrapper for the win32 api calls
+		///		for serial communication.
 		struct SerialDevice	final
 		{				
 			SerialDevice(std::nullptr_t);
@@ -123,7 +130,7 @@ namespace Win32
 			uint32_t m_baudrate = 9600U;
 
 			/// The size of a byte.
-			SerialByteSize m_byteSize = Byte_Size8b;
+			SerialByteSize m_byteSize = SerialByteSize::Byte_Size8b;
 
 			/// Handle for a thread to await comm events
 			std::thread m_thCommEv;
