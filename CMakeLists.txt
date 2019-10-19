@@ -48,11 +48,6 @@ if (WIN32)
 	add_definitions(-DUNICODE)
 endif()
 
-
-if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-	set(mcu CMAKE_HOST_SYSTEM_PROCESSOR)
-endif()
-
 find_library(CoreZero-SDK
 	NAMES corezero.lib
 	HINTS "${PROJECT_SOURCE_DIR}/../../LooUQ/CoreZero-SDK"
@@ -91,8 +86,19 @@ file(GLOB_RECURSE LIB_INCLUDES FOLLOW_SYMLINKS "${PROJECT_SOURCE_DIR}/include/*.
 #	Setup Library by root
 #
 if (MSVC)
-	set (CMAKE_CXX_FLAGS "/IGNORE:4996")
+	set (CMAKE_CXX_FLAGS
+		/EHsc			# Exception unwinding
+	)
+
+	#	Add '/GX' flag to handle exceptions (1)
+	if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")	
+		set (CMAKE_CXX_FLAGS
+			/GX
+		)
+	endif()
 endif()
+
+
 
 
 #	Build library as shared or static
@@ -111,3 +117,9 @@ target_include_directories("${PROJECT_LIB_NAME}" PRIVATE "${PROJECT_SOURCE_DIR}/
 
 target_sources("${PROJECT_LIB_NAME}" PUBLIC "${LIB_INCLUDES}")	# include library headers
 target_sources("${PROJECT_LIB_NAME}" PRIVATE "${LIB_SOURCES}")	# include library source code
+
+
+
+## References
+#
+# (1) https://clang.llvm.org/docs/UsersManual.html#clang-cl
